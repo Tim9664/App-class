@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neo Cyber Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .grid-pattern {
+            background-size: 40px 40px;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        }
+    </style>
+</head>
+<body class="bg-[#0b0f19] text-slate-100 min-h-screen relative overflow-x-hidden font-sans">
+    <!-- 背景網格與發光流體 -->
+    <div class="fixed inset-0 grid-pattern pointer-events-none"></div>
+    <div class="fixed top-1/4 left-1/4 w-96 h-96 bg-purple-600/25 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+    <div class="fixed top-1/3 right-1/4 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none animate-pulse"></div>
+
+    <!-- 頂部導覽列 -->
+    <header class="relative z-20 border-b border-white/10 backdrop-blur-md sticky top-0 bg-[#0b0f19]/70">
+        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-400 p-[1px] flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <div class="w-full h-full bg-[#0b0f19] rounded-xl flex items-center justify-center">
+                        <i data-lucide="zap" class="w-5 h-5 text-cyan-400"></i>
+                    </div>
+                </div>
+                <span class="font-extrabold text-lg tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-cyan-300">
+                    CYBER<span class="text-indigo-400">.CORE</span>
+                </span>
+            </div>
+            <div class="flex items-center space-x-2 px-3 py-1.5 rounded-full glass text-xs text-slate-300">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>SYSTEM ONLINE</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主區塊 -->
+    <main class="relative z-10 max-w-5xl mx-auto px-6 pt-16 pb-20 flex flex-col items-center">
+        <!-- 標籤 -->
+        <div class="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full glass mb-8 text-xs font-mono tracking-wide text-cyan-300">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span>NEXT-GEN INTERFACE</span>
+        </div>
+
+        <h1 class="text-5xl sm:text-7xl font-extrabold tracking-tight text-center leading-tight mb-6">
+            未來科技感，<br class="hidden sm:inline">
+            <span class="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-indigo-400 to-fuchsia-500">
+                極致沉浸視覺體驗
+            </span>
+        </h1>
+
+        <p class="text-slate-400 text-lg sm:text-xl text-center max-w-2xl mb-10 leading-relaxed font-light">
+            融合玻璃擬態（Glassmorphism）、微光暗黑介面與動態霓虹反饋。
+        </p>
+
+        <!-- 互動按鈕群組 -->
+        <div class="flex flex-wrap items-center justify-center gap-4 mb-16">
+            <button id="energyBtn" class="group relative px-7 py-3.5 rounded-xl font-semibold text-white transition-all duration-300 overflow-hidden shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/50 active:scale-95">
+                <div class="absolute inset-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-500 transition-all duration-500 group-hover:opacity-90"></div>
+                <span class="relative flex items-center space-x-2">
+                    <i data-lucide="flame" class="w-5 h-5 text-amber-300"></i>
+                    <span>點擊充能</span>
+                    <span id="counter" class="bg-white/20 text-xs px-2.5 py-0.5 rounded-full font-mono">0</span>
+                </span>
+            </button>
+
+            <button id="copyBtn" class="px-7 py-3.5 rounded-xl glass hover:border-indigo-400/50 text-slate-300 hover:text-white font-medium transition duration-300 flex items-center space-x-2 active:scale-95">
+                <i data-lucide="share-2" class="w-4 h-4 text-cyan-400"></i>
+                <span id="copyText">複製分享網址</span>
+            </button>
+        </div>
+
+        <!-- 特色功能三卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mb-10">
+            <div class="glass p-7 rounded-2xl hover:border-indigo-500/40 hover:-translate-y-1 transition duration-300">
+                <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-5">
+                    <i data-lucide="cpu" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">高速流暢核心</h3>
+                <p class="text-slate-400 text-sm leading-relaxed">
+                    極致輕量與硬體加速，隨時保持絲滑的高幀率體驗。
+                </p>
+            </div>
+
+            <div class="glass p-7 rounded-2xl hover:border-purple-500/40 hover:-translate-y-1 transition duration-300">
+                <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-5">
+                    <i data-lucide="shield-check" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">玻璃擬態層次</h3>
+                <p class="text-slate-400 text-sm leading-relaxed">
+                    多層次毛玻璃背景（Backdrop Filter），搭配深邃高光邊界。
+                </p>
+            </div>
+
+            <div class="glass p-7 rounded-2xl hover:border-cyan-500/40 hover:-translate-y-1 transition duration-300">
+                <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-5">
+                    <i data-lucide="activity" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">賽博動態矩陣</h3>
+                <p class="text-slate-400 text-sm leading-relaxed">
+                    提供即時動態回饋數值，隨滑鼠與按鈕即時響應。
+                </p>
+            </div>
+        </div>
+
+        <!-- 儀表板狀態列 -->
+        <div class="w-full glass p-6 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="text-center sm:text-left">
+                <div class="text-xs font-mono uppercase text-indigo-400 tracking-wider">Monitor Status</div>
+                <div class="text-lg font-bold text-white">矩陣能源核心狀態</div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <div class="glass px-4 py-2 rounded-xl text-center">
+                    <div class="text-xs text-slate-400 font-mono">CORE</div>
+                    <div class="text-emerald-400 font-bold font-mono">STABLE</div>
+                </div>
+                <div class="glass px-4 py-2 rounded-xl text-center">
+                    <div class="text-xs text-slate-400 font-mono">ENERGY</div>
+                    <div id="energyPercent" class="text-cyan-400 font-bold font-mono">0%</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 頁尾 -->
+    <footer class="relative z-10 text-center py-8 border-t border-white/5 text-xs text-slate-500 font-mono">
+        © 2026 CYBER.CORE · ALL SYSTEMS OPERATIONAL
+    </footer>
+
+    <!-- 腳本邏輯 -->
+    <script>
+        lucide.createIcons();
+
+        let count = 0;
+        const energyBtn = document.getElementById('energyBtn');
+        const counter = document.getElementById('counter');
+        const energyPercent = document.getElementById('energyPercent');
+
+        energyBtn.addEventListener('click', () => {
+            count++;
+            counter.textContent = count;
+            const percent = Math.min(count * 10, 100);
+            energyPercent.textContent = percent + '%';
+            if (percent === 100) {
+                energyPercent.classList.remove('text-cyan-400');
+                energyPercent.classList.add('text-amber-400');
+            }
+        });
+
+        const copyBtn = document.getElementById('copyBtn');
+        const copyText = document.getElementById('copyText');
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                copyText.textContent = '已複製網址！';
+                setTimeout(() => { copyText.textContent = '複製分享網址'; }, 2000);
+            }).catch(() => {
+                copyText.textContent = '已點擊！';
+                setTimeout(() => { copyText.textContent = '複製分享網址'; }, 2000);
+            });
+        });
+    </script>
+</body>
+</html>
