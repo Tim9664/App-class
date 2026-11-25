@@ -1,6 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-app.js";
 import {
   GoogleAuthProvider,
+  browserLocalPersistence,
+  browserSessionPersistence,
   getRedirectResult,
   getAuth,
   onAuthStateChanged,
@@ -8,6 +10,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
   signOut,
+  setPersistence,
 } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js";
 import {
   collection,
@@ -37,6 +40,27 @@ export const appCheck = app && (isLocalDevelopment || appCheckSiteKey)
     })
   : null;
 export const auth = app ? getAuth(app) : null;
+const rememberLoginKey = "rishu-keep-signed-in";
+function shouldRememberLogin() {
+  try {
+    return localStorage.getItem(rememberLoginKey) !== "false";
+  } catch {
+    return true;
+  }
+}
+export const authPersistenceReady = auth
+  ? setPersistence(auth, shouldRememberLogin() ? browserLocalPersistence : browserSessionPersistence)
+  : Promise.resolve();
+export async function setLoginPersistence(remember) {
+  if (!auth) return;
+  try {
+    localStorage.setItem(rememberLoginKey, String(remember));
+  } catch {
+    // Firebase still applies the selected persistence for this page session.
+  }
+  await authPersistenceReady;
+  await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+}
 export const db = app ? getFirestore(app) : null;
 const ai = app && appCheck ? getAI(app, {
   backend: new GoogleAIBackend(),
