@@ -1,0 +1,178 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Assumed data model (Standard edition, default database):
+    // users/{uid}/tasks/{taskId}: id, uid, title, due, minutes, importance,
+    // category, done, cancelled, reminder, repeat. Schedule segments are stored
+    // separately so each segment can be validated by the rules.
+    // users/{uid}/events/{eventId}: id, uid, title, date, start, end, color, repeat.
+    // users/{uid}/sessions/{sessionId}: id, uid, taskId, date, start, end, status.
+    // users/{uid}/reminders/{taskId}: private delivery state, written only by
+    // trusted Cloud Functions and readable only by that user.
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    function uidUnchanged() {
+      return request.resource.data.keys().hasAll(['uid']) &&
+        request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return request.resource.data.uid == resource.data.uid;
+    }
+
+    function validDate(value) {
+      return value is string &&
+        value.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$');
+    }
+
+    function validClock(value) {
+      return value is string &&
+        value.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+    }
+
+    function validReminder(value) {
+      return value == null || (
+        value is map &&
+        value.keys().hasAll(['at', 'email']) &&
+        value.keys().hasOnly(['at', 'email', 'atUtc']) &&
+        value.at is string && value.at.size() <= 16 &&
+        value.at.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]$') &&
+        value.email is string && value.email.size() > 3 && value.email.size() <= 254 &&
+        value.email.matches('^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$') &&
+        (!('atUtc' in value) || (
+          value.atUtc is string && value.atUtc.size() == 24 &&
+          value.atUtc.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$')
+        ))
+      );
+    }
+
+    function validTaskRepeat(value) {
+      return value == null || (
+        value is map &&
+        value.keys().hasAll(['start', 'every', 'unit', 'time']) &&
+        value.keys().hasOnly(['start', 'every', 'unit', 'time']) &&
+        validDate(value.start) &&
+        value.every is int && value.every >= 1 && value.every <= 99 &&
+        value.unit in ['day', 'week', 'month'] &&
+        validClock(value.time)
+      );
+    }
+
+    function validEventRepeat(value) {
+      return value == null || (
+        value is map &&
+        value.keys().hasAll(['every', 'unit']) &&
+        value.keys().hasOnly(['every', 'unit']) &&
+        value.every is int && value.every >= 1 && value.every <= 99 &&
+        value.unit in ['day', 'week', 'month']
+      );
+    }
+
+    function isValidTask(data, taskId) {
+      return data.keys().hasAll([
+          'id', 'uid', 'title', 'due', 'minutes', 'importance', 'category',
+          'done', 'cancelled', 'reminder', 'repeat'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'uid', 'title', 'due', 'minutes', 'importance', 'category',
+          'done', 'cancelled', 'reminder', 'repeat'
+        ]) &&
+        data.id == taskId && data.id is string && data.id.size() <= 120 &&
+        data.uid is string && data.uid.size() <= 128 &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 90 &&
+        (data.due == null || validDate(data.due)) &&
+        data.minutes is int && data.minutes >= 15 && data.minutes <= 10080 &&
+        data.importance is int && data.importance in [1, 2, 3] &&
+        data.category in ['工作', '個人', '學習', '生活'] &&
+        data.done is bool && data.cancelled is bool &&
+        validReminder(data.reminder) && validTaskRepeat(data.repeat);
+    }
+
+    function isValidEvent(data, eventId) {
+      return data.keys().hasAll([
+          'id', 'uid', 'title', 'date', 'start', 'end', 'color', 'repeat'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'uid', 'title', 'date', 'start', 'end', 'color', 'repeat'
+        ]) &&
+        data.id == eventId && data.id is string && data.id.size() <= 120 &&
+        data.uid is string && data.uid.size() <= 128 &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 80 &&
+        validDate(data.date) && validClock(data.start) && validClock(data.end) &&
+        data.end > data.start && data.color in ['purple', 'blue', 'mint', 'orange'] &&
+        validEventRepeat(data.repeat);
+    }
+
+    function taskExistsAfter(userId, taskId) {
+      let taskPath = /databases/$(database)/documents/users/$(userId)/tasks/$(taskId);
+      return getAfter(taskPath).data.uid == userId;
+    }
+
+    function isValidSession(data, sessionId, userId) {
+      return data.keys().hasAll([
+          'id', 'uid', 'taskId', 'date', 'start', 'end', 'status'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'uid', 'taskId', 'date', 'start', 'end', 'status'
+        ]) &&
+        data.id == sessionId && data.id is string && data.id.size() <= 120 &&
+        data.uid == userId && data.uid is string &&
+        data.taskId is string && data.taskId.size() > 0 && data.taskId.size() <= 120 &&
+        validDate(data.date) && validClock(data.start) && validClock(data.end) &&
+        data.end > data.start && data.status in ['scheduled', 'cancelled'];
+    }
+
+    match /users/{userId}/tasks/{taskId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && uidUnchanged() &&
+        isValidTask(request.resource.data, taskId);
+      allow update: if isOwner(userId) && isDocOwner() && uidNotModified() &&
+        isValidTask(request.resource.data, taskId);
+      allow delete: if isOwner(userId) && isDocOwner();
+    }
+
+    match /users/{userId}/events/{eventId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && uidUnchanged() &&
+        isValidEvent(request.resource.data, eventId);
+      allow update: if isOwner(userId) && isDocOwner() && uidNotModified() &&
+        isValidEvent(request.resource.data, eventId);
+      allow delete: if isOwner(userId) && isDocOwner();
+    }
+
+    match /users/{userId}/sessions/{sessionId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && uidUnchanged() &&
+        isValidSession(request.resource.data, sessionId, userId) &&
+        taskExistsAfter(userId, request.resource.data.taskId);
+      allow update: if isOwner(userId) && isDocOwner() && uidNotModified() &&
+        request.resource.data.taskId == resource.data.taskId &&
+        isValidSession(request.resource.data, sessionId, userId) &&
+        taskExistsAfter(userId, request.resource.data.taskId);
+      allow delete: if isOwner(userId) && isDocOwner();
+    }
+
+    // Reminder state contains recipient email and is managed only by trusted
+    // Cloud Functions. The owner can inspect delivery status but cannot forge it.
+    match /users/{userId}/reminders/{taskId} {
+      allow read: if isOwner(userId);
+      allow create, update, delete: if false;
+    }
+
+    // No public access and no access to unrecognized collections or paths.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

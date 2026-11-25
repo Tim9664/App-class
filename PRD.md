@@ -181,6 +181,6 @@
 
 ## 13. 原型狀態
 
-目前 HTML 原型支援本機任務／行程資料、今日／週／月檢視、任務排序、自動排程、重複規則、提醒欄位，以及取消／復原操作。原型使用瀏覽器本機儲存與示範行程；Google OAuth、Google Calendar 真實同步及 Email 寄送尚未實作。
+目前網頁版支援 Firebase Authentication、Firestore 任務與行程同步、Google Calendar 同步、AI 助理及 Email 提醒設定。Email 提醒已接上 Firebase Functions 與 Resend 寄送佇列；啟用寄送仍需 Firebase Blaze 計費方案、已驗證寄件網域、Resend API 金鑰及後端部署。
 
 原型檔案：[index.html](C:/Users/ncucc/Documents/ChatGPT/APP20261030/index.html)
