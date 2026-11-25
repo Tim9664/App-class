@@ -106,7 +106,7 @@
   <div class="modal-backdrop" id="eventModalBackdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="eventModalTitle"><div class="modal-head"><div><h2 id="eventModalTitle">新增行程</h2><p>已新增的行程會佔用日曆時段，智慧排程會自動避開。</p></div><button class="close-btn" data-close="eventModalBackdrop" aria-label="關閉">×</button></div><form id="eventForm"><div class="form-grid"><div class="field full"><label for="eventTitle">行程名稱</label><input id="eventTitle" required maxlength="80" placeholder="例如：團隊週會"></div><div class="field"><label for="eventDate">日期</label><input id="eventDate" type="date" required></div><div class="field"><label for="eventColor">顯示色彩</label><select id="eventColor"><option value="purple">紫色</option><option value="blue">藍色</option><option value="mint">綠色</option><option value="orange">橘色</option></select></div><div class="field"><label for="eventStart">開始時間</label><input id="eventStart" type="time" value="10:00" required></div><div class="field"><label for="eventEnd">結束時間</label><input id="eventEnd" type="time" value="11:00" required></div><div class="field full"><label class="check-row"><input id="eventRecurring" type="checkbox"> 這是重複行程</label></div><div class="field conditional" id="eventRepeatEveryField"><label for="eventRepeatEvery">每隔</label><input id="eventRepeatEvery" type="number" value="1" min="1" max="99"></div><div class="field conditional" id="eventRepeatUnitField"><label for="eventRepeatUnit">重複單位</label><select id="eventRepeatUnit"><option value="day">天</option><option value="week">週</option><option value="month">月</option></select></div><div class="recur-note" id="eventRecurrenceNote" style="display:none">重複行程會在未來 4 週預覽中顯示；正式版可提供結束日期與例外日期。</div></div><div class="modal-actions"><button type="button" class="secondary-btn" data-close="eventModalBackdrop">取消</button><button class="primary-btn" type="submit">儲存行程</button></div></form></section></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script type="module">
-  import { auth, db, firebaseConfigured, assistantModel, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, reauthenticateWithPopup, signOut, collection, doc, onSnapshot, writeBatch } from './firebase-client.js?v=20261124-firebase13';
+  import { auth, db, firebaseConfigured, assistantModel, GoogleAuthProvider, getRedirectResult, onAuthStateChanged, signInWithPopup, signInWithRedirect, reauthenticateWithPopup, signOut, collection, doc, onSnapshot, writeBatch } from './firebase-client.js?v=20261125-auth-appcheck';
   (async()=>{
     const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
     const today=new Date();today.setHours(0,0,0,0);
@@ -139,7 +139,7 @@
     const stableJSON=value=>JSON.stringify(value,(key,item)=>item&&typeof item==='object'&&!Array.isArray(item)?Object.keys(item).sort().reduce((sorted,k)=>(sorted[k]=item[k],sorted),{}):item);
     let selectedDate=new Date(today), view='today', page='home', filter='all';
     function showAuthMessage(message,error=false){$('#authMessage').textContent=error?'登入或資料同步遇到問題。':message;$('#authError').hidden=!error;$('#authError').textContent=error?message:''}
-    function showAuthGate(message,error=false){$('#assistantWidget').hidden=!!currentUser;$('#assistantPanel').hidden=true;$('#assistantToggle').setAttribute('aria-expanded','false');$('#assistantToggle').setAttribute('aria-label','開啟 AI 助理');$('#assistantToggle').textContent='✦';$('#authGate').hidden=false;$('#app').hidden=true;if(message)showAuthMessage(message,error)}
+    function showAuthGate(message,error=false){const signedIn=!!currentUser;$('#assistantWidget').hidden=signedIn;$('#assistantPanel').hidden=true;$('#assistantToggle').setAttribute('aria-expanded','false');$('#assistantToggle').setAttribute('aria-label','開啟 AI 助理');$('#assistantToggle').textContent='✦';$('#authGate').hidden=false;$('#app').hidden=true;$('#googleSignIn').innerHTML=signedIn?'重新載入雲端資料':'<span class="google-g">G</span>使用 Google 帳戶登入';$('#googleSignIn').disabled=!signedIn&&!firebaseConfigured;if(message)showAuthMessage(message,error)}
     function showWorkspace(){
       $('#authGate').hidden=true;$('#app').hidden=false;$('#assistantWidget').hidden=false;
       const name=currentUser?.displayName||currentUser?.email||'我的空間';
@@ -272,8 +272,8 @@
       for(const session of sessionDocs){const task=byId.get(session.taskId);if(!task)continue;const item={id:session.id,date:session.date,start:session.start,end:session.end};(session.status==='cancelled'?task.cancelledSessions:task.sessions).push(item)}
       events=[...remoteDocs.events.values()];
     }
-    function openWorkspace(user){
-      if(currentUser?.uid===user.uid&&unsubscribe.length)return;
+    function openWorkspace(user,forceReload=false){
+      if(currentUser?.uid===user.uid&&unsubscribe.length&&!forceReload)return;
       stopWorkspaceListeners();currentUser=user;showAuthGate('登入成功，正在載入雲端資料…');
       for(const name of ['tasks','events','sessions']){
         const ref=collection(db,'users',user.uid,name);
@@ -284,7 +284,12 @@
           if(loadedCollections.size===3){cloudLoaded=true;hydrateWorkspace();showWorkspace()}
         },error=>{
           if(currentUser?.uid!==user.uid)return;
-          showAuthGate(error.code==='permission-denied'?'Firestore 規則尚未允許此帳戶存取；請先發布專案中的 firestore.rules。':`載入雲端資料失敗：${error.message}`,true);
+          const details=`${error?.code||''} ${error?.message||''}`.toLowerCase();
+          const message=details.includes('app check')||details.includes('appcheck')||details.includes('app_check')||details.includes('recaptcha')
+            ?`Google 已登入，但 Firebase App Check 阻擋了雲端資料連線。請管理者確認 ${location.hostname} 已加入 reCAPTCHA Enterprise 金鑰允許網域，並已在 Firebase App Check 註冊這個 Web App。`
+            :error.code==='permission-denied'?'Google 已登入，但 Firestore 規則尚未允許此帳戶存取；請管理者檢查已部署的 firestore.rules。'
+            :`Google 已登入，但雲端資料載入失敗：${error.message||'請檢查網路後重試。'}`;
+          showAuthGate(message,true);
         });
         unsubscribe.push(stop);
       }
@@ -353,7 +358,7 @@
     function assistantErrorMessage(error){
       const details=`${error?.code||''} ${error?.message||''}`.toLowerCase();
       if(details.includes('tos_required')||details.includes('generative language')||details.includes('permission_denied'))return 'Gemini 服務尚未完成啟用。請先完成 Firebase AI Logic 專案初始化與服務條款設定。';
-      if(details.includes('app check')||details.includes('appcheck')||details.includes('app_check'))return 'Firebase App Check 驗證失敗，請重新整理後再試；若仍無法使用，請聯絡系統管理者檢查 App Check 設定。';
+      if(details.includes('app check')||details.includes('appcheck')||details.includes('app_check')||details.includes('recaptcha'))return `AI 驗證未通過。請管理者在 reCAPTCHA Enterprise 金鑰中允許 ${location.hostname}，並在 Firebase App Check 為此 Web App 註冊 reCAPTCHA Enterprise；儲存後重新整理即可。`;
       return `目前無法取得 AI 回覆：${error?.message||'請稍後再試。'}`;
     }
     async function sendAssistantMessage(text){
@@ -405,7 +410,28 @@
       resetAssistantChat();
       $('#assistantForm').onsubmit=e=>{e.preventDefault();const field=$('#assistantInput'),message=field.value;field.value='';sendAssistantMessage(message)};
       $('#assistantInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('#assistantForm').requestSubmit()}});
-      $('#googleSignIn').onclick=async()=>{if(!firebaseConfigured){showAuthGate('尚未設定 Firebase Web App 設定，請先填寫 firebase-config.js。',true);return}try{await signInWithPopup(auth,new GoogleAuthProvider())}catch(error){const message=error.code==='auth/unauthorized-domain'?'登入網域尚未加入 Firebase Authentication 的授權網域。':error.code==='auth/popup-blocked'?'瀏覽器封鎖了登入視窗，請允許彈出視窗後重試。':`Google 登入失敗：${error.message}`;showAuthGate(message,true)}};
+      $('#googleSignIn').onclick=async()=>{
+        if(currentUser){openWorkspace(currentUser,true);return}
+        if(!firebaseConfigured){showAuthGate('尚未設定 Firebase Web App 設定，請先填寫 firebase-config.js。',true);return}
+        const button=$('#googleSignIn'),provider=new GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});button.disabled=true;button.textContent='正在連線 Google…';
+        const mobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+        let redirecting=false;
+        try{
+          if(mobile){redirecting=true;await signInWithRedirect(auth,provider);return}
+          try{await signInWithPopup(auth,provider)}
+          catch(error){if(['auth/popup-blocked','auth/operation-not-supported-in-this-environment'].includes(error.code)){redirecting=true;await signInWithRedirect(auth,provider);return}throw error}
+        }catch(error){
+          redirecting=false;
+          const details=`${error?.code||''} ${error?.message||''}`.toLowerCase();
+          const message=details.includes('app check')||details.includes('appcheck')||details.includes('app_check')
+            ?'Firebase App Check 阻擋了登入請求。請管理者確認此網域與 Web App 的 App Check 設定。'
+            :error.code==='auth/unauthorized-domain'?'登入網域尚未加入 Firebase Authentication 的授權網域。'
+            :error.code==='auth/operation-not-allowed'?'Firebase Authentication 尚未啟用 Google 登入提供者。'
+            :error.code==='auth/network-request-failed'?'網路連線失敗，請確認網路後再試。'
+            :`Google 登入失敗：${error.message||error.code||'請稍後再試。'}`;
+          showAuthGate(message,true)
+        }finally{if(!redirecting)button.disabled=false}
+      };
       $('#signOutBtn').onclick=async()=>{try{clearTimeout(saveTimer);await saveQueue;await syncWorkspace();await signOut(auth)}catch(error){showToast(`同步未完成，請稍後再登出：${error.message}`)}};
       $$('[data-page]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.page)));
       $$('[data-nav]').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.nav)));
@@ -426,10 +452,13 @@
     }
     bind();
     if(!firebaseConfigured){$('#googleSignIn').disabled=true;showAuthGate('尚未設定 Firebase Web App 設定，請先填寫 firebase-config.js。',true)}
-    else onAuthStateChanged(auth,user=>{
+    else {
+      getRedirectResult(auth).catch(error=>{if(!auth.currentUser){const message=error.code==='auth/unauthorized-domain'?'登入網域尚未加入 Firebase Authentication 的授權網域。':`Google 登入未完成：${error.message||error.code||'請稍後再試。'}`;showAuthGate(message,true)}});
+      onAuthStateChanged(auth,user=>{
       if(user){resetAssistantChat();toggleAssistant(false);openWorkspace(user);return}
       stopWorkspaceListeners();currentUser=null;tasks=[];events=[];resetAssistantChat();toggleAssistant(false);renderGoogleCalendarStatus();showAuthGate('使用 Google 帳戶登入，任務與行程會安全儲存在你的 Firestore 空間。');
-    },error=>showAuthGate(`Firebase Authentication 錯誤：${error.message}`,true));
+      },error=>showAuthGate(`Firebase Authentication 錯誤：${error.message}`,true));
+    }
   })();
   </script>
 </body>
